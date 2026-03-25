@@ -63,6 +63,15 @@ type VenueType =
   | 'pub'
   | 'playground'
   | 'community_centre'
+  | 'bar'
+  | 'fast_food'
+  | 'garden'
+  | 'theatre'
+  | 'arts_centre'
+  | 'fitness_centre'
+  | 'sports_centre'
+  | 'escape_game'
+  | 'swimming_pool'
   | string
 
 /** Result of an isochrone computation. */
@@ -97,6 +106,43 @@ interface Venue {
   osmId?: string  // e.g. 'node/123456'
 }
 
+/** GeoJSON LineString geometry. */
+interface GeoJSONLineString {
+  type: 'LineString'
+  coordinates: number[][]
+}
+
+/** A single manoeuvre in a route. */
+interface RouteLeg {
+  instruction: string
+  distanceKm: number
+  durationMinutes: number
+  type?: number              // Valhalla manoeuvre type (0-38)
+  streetNames?: string[]
+  beginStreetNames?: string[]
+  verbalInstruction?: string
+  toll?: boolean
+  highway?: boolean
+  ferry?: boolean
+  rough?: boolean
+  gate?: boolean
+  bearingBefore?: number
+  bearingAfter?: number
+  beginShapeIndex?: number
+  endShapeIndex?: number
+}
+
+/** Result of a single route computation. */
+interface RouteGeometry {
+  origin: LatLon
+  destination: LatLon
+  mode: TransportMode
+  durationMinutes: number
+  distanceKm: number
+  geometry: GeoJSONLineString
+  legs?: RouteLeg[]
+}
+
 /** Options for rendezvous calculation. */
 interface RendezvousOptions {
   participants: LatLon[]       // at least 2 required
@@ -105,6 +151,7 @@ interface RendezvousOptions {
   venueTypes: VenueType[]
   fairness?: FairnessStrategy  // default: 'min_max'
   limit?: number               // max suggestions to return, default: 5
+  strategy?: 'auto' | 'hull' | 'isochrone'  // pipeline strategy, default: 'auto'
 }
 
 /** A ranked rendezvous suggestion. */
@@ -112,6 +159,7 @@ interface RendezvousSuggestion {
   venue: Venue
   travelTimes: Record<string, number>  // keyed by participant label or 'participant_N'
   fairnessScore: number                // lower is better
+  metadata?: { strategy: 'hull' | 'isochrone' }  // which pipeline was used
 }
 
 /** Engine-agnostic routing interface. Implement this to add a custom engine. */
@@ -119,6 +167,7 @@ interface RoutingEngine {
   readonly name: string
   computeIsochrone(origin: LatLon, mode: TransportMode, timeMinutes: number): Promise<Isochrone>
   computeRouteMatrix(origins: LatLon[], destinations: LatLon[], mode: TransportMode): Promise<RouteMatrix>
+  computeRoute(origin: LatLon, destination: LatLon, mode: TransportMode): Promise<RouteGeometry>
 }
 
 /** Bounding box (from rendezvous-kit/geo). */
@@ -413,6 +462,15 @@ Built-in `VenueType` to Overpass tag mapping:
 | `pub` | `amenity=pub` |
 | `playground` | `leisure=playground` |
 | `community_centre` | `amenity=community_centre` |
+| `bar` | `amenity=bar` |
+| `fast_food` | `amenity=fast_food` |
+| `garden` | `leisure=garden` |
+| `theatre` | `amenity=theatre` |
+| `arts_centre` | `amenity=arts_centre` |
+| `fitness_centre` | `leisure=fitness_centre` |
+| `sports_centre` | `leisure=sports_centre` |
+| `escape_game` | `leisure=escape_game` |
+| `swimming_pool` | `leisure=swimming_pool` |
 
 Unknown strings are passed through as `amenity=<value>`.
 
@@ -421,7 +479,7 @@ Unknown strings are passed through as `amenity=<value>`.
 ## Implementing a Custom Engine
 
 ```typescript
-import type { RoutingEngine, LatLon, TransportMode, Isochrone, RouteMatrix } from 'rendezvous-kit'
+import type { RoutingEngine, LatLon, TransportMode, Isochrone, RouteMatrix, RouteGeometry } from 'rendezvous-kit'
 
 class MyRoutingEngine implements RoutingEngine {
   readonly name = 'MyEngine'
@@ -454,6 +512,27 @@ class MyRoutingEngine implements RoutingEngine {
     }
     return { origins, destinations, entries }
   }
+
+  async computeRoute(
+    origin: LatLon,
+    destination: LatLon,
+    mode: TransportMode,
+  ): Promise<RouteGeometry> {
+    const raw = await myApi.getRoute(origin, destination, mode)
+    return {
+      origin,
+      destination,
+      mode,
+      durationMinutes: raw.seconds / 60,
+      distanceKm: raw.metres / 1000,
+      geometry: { type: 'LineString', coordinates: raw.polyline },
+      legs: raw.steps.map((s: any) => ({
+        instruction: s.text,
+        distanceKm: s.metres / 1000,
+        durationMinutes: s.seconds / 60,
+      })),
+    }
+  }
 }
 
 // Use it with findRendezvous
@@ -464,12 +543,12 @@ const suggestions = await findRendezvous(new MyRoutingEngine(), options)
 
 ## Engine Comparison
 
-| Engine | Isochrone | Matrix | Auth | Notes |
-|--------|:---------:|:------:|------|-------|
-| Valhalla | Yes | Yes | None | Best self-hosted option; supports public transit |
-| OpenRouteService | Yes | Yes | API key | Free tier available; no public transit |
-| GraphHopper | Yes | Yes | Optional | API key only for cloud; optional self-hosted |
-| OSRM | No | Yes | None | Fastest matrix; no isochrone support |
+| Engine | Isochrone | Matrix | Route | Auth | Notes |
+|--------|:---------:|:------:|:-----:|------|-------|
+| Valhalla | Yes | Yes | Yes | None | Best self-hosted option; supports public transit |
+| OpenRouteService | Yes | Yes | No | API key | Free tier available; no public transit |
+| GraphHopper | Yes | Yes | No | Optional | API key only for cloud; optional self-hosted |
+| OSRM | No | Yes | No | None | Fastest matrix; no isochrone support |
 
 ---
 

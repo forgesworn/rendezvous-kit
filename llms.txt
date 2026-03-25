@@ -52,10 +52,13 @@ Pure-TypeScript polygon geometry.
 - GeoJSONPolygon: { type: 'Polygon', coordinates: number[][][] }
 - TransportMode: 'drive' | 'cycle' | 'walk' | 'public_transit'
 - FairnessStrategy: 'min_max' | 'min_total' | 'min_variance'
-- VenueType: 'park' | 'cafe' | 'restaurant' | 'service_station' | 'library' | 'pub' | 'playground' | 'community_centre' | string
-- RendezvousOptions: { participants, mode, maxTimeMinutes, venueTypes, fairness?, limit? }
-- RendezvousSuggestion: { venue, travelTimes: Record<string, number>, fairnessScore }
-- RoutingEngine: interface { name, computeIsochrone, computeRouteMatrix }
+- VenueType: 'park' | 'cafe' | 'restaurant' | 'service_station' | 'library' | 'pub' | 'playground' | 'community_centre' | 'bar' | 'fast_food' | 'garden' | 'theatre' | 'arts_centre' | 'fitness_centre' | 'sports_centre' | 'escape_game' | 'swimming_pool' | string
+- RendezvousOptions: { participants, mode, maxTimeMinutes, venueTypes, fairness?, limit?, strategy? }
+- RendezvousSuggestion: { venue, travelTimes: Record<string, number>, fairnessScore, metadata? }
+- RoutingEngine: interface { name, computeIsochrone, computeRouteMatrix, computeRoute }
+- RouteGeometry: { origin, destination, mode, durationMinutes, distanceKm, geometry: GeoJSONLineString, legs?: RouteLeg[] }
+- RouteLeg: { instruction, distanceKm, durationMinutes, type?, streetNames?, verbalInstruction?, ... }
+- GeoJSONLineString: { type: 'LineString', coordinates: number[][] }
 
 ## Fairness Strategies
 

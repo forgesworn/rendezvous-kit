@@ -94,12 +94,12 @@ for (const s of suggestions) {
 
 ## Engine Support
 
-| Engine | Isochrone | Route Matrix | Auth |
-|--------|:---------:|:------------:|------|
-| Valhalla | Yes | Yes | None (self-hosted) |
-| OpenRouteService | Yes | Yes | API key |
-| GraphHopper | Yes | Yes | API key (optional) |
-| OSRM | No | Yes | None (self-hosted) |
+| Engine | Isochrone | Route Matrix | Route | Auth |
+|--------|:---------:|:------------:|:-----:|------|
+| Valhalla | Yes | Yes | Yes | None (self-hosted) |
+| OpenRouteService | Yes | Yes | No | API key |
+| GraphHopper | Yes | Yes | No | API key (optional) |
+| OSRM | No | Yes | No | None (self-hosted) |
 
 OSRM does not support isochrone computation — use it only when you need a fast route matrix and are supplying your own intersection polygon.
 
@@ -154,14 +154,17 @@ OSRM does not support isochrone computation — use it only when you need a fast
 | `GeoJSONPolygon` | Standard GeoJSON polygon geometry |
 | `TransportMode` | `'drive' \| 'cycle' \| 'walk' \| 'public_transit'` |
 | `FairnessStrategy` | `'min_max' \| 'min_total' \| 'min_variance'` |
-| `VenueType` | `'park' \| 'cafe' \| 'restaurant' \| 'service_station' \| 'library' \| 'pub' \| 'playground' \| 'community_centre' \| string` |
-| `RoutingEngine` | Interface — `computeIsochrone` + `computeRouteMatrix` |
+| `VenueType` | `'park' \| 'cafe' \| 'restaurant' \| 'service_station' \| 'library' \| 'pub' \| 'playground' \| 'community_centre' \| 'bar' \| 'fast_food' \| 'garden' \| 'theatre' \| 'arts_centre' \| 'fitness_centre' \| 'sports_centre' \| 'escape_game' \| 'swimming_pool' \| string` |
+| `RoutingEngine` | Interface — `computeIsochrone` + `computeRouteMatrix` + `computeRoute` |
 | `Isochrone` | `{ origin, mode, timeMinutes, polygon }` |
 | `MatrixEntry` | `{ originIndex, destinationIndex, durationMinutes, distanceKm }` |
 | `RouteMatrix` | `{ origins, destinations, entries }` |
 | `Venue` | `{ name, lat, lon, venueType, osmId? }` |
-| `RendezvousOptions` | `{ participants, mode, maxTimeMinutes, venueTypes, fairness?, limit? }` |
-| `RendezvousSuggestion` | `{ venue, travelTimes, fairnessScore }` |
+| `RendezvousOptions` | `{ participants, mode, maxTimeMinutes, venueTypes, fairness?, limit?, strategy? }` |
+| `RendezvousSuggestion` | `{ venue, travelTimes, fairnessScore, metadata? }` |
+| `RouteGeometry` | `{ origin, destination, mode, durationMinutes, distanceKm, geometry, legs? }` |
+| `RouteLeg` | `{ instruction, distanceKm, durationMinutes, type?, streetNames?, ... }` |
+| `GeoJSONLineString` | `{ type: 'LineString', coordinates: number[][] }` |
 | `BBox` | `{ minLon, minLat, maxLon, maxLat }` |
 | `Coordinate` | `{ lat, lon }` |
 
@@ -196,7 +199,7 @@ If the isochrones do not overlap, `findRendezvous` returns an empty array. If no
 ## Implementing a Custom Engine
 
 ```typescript
-import type { RoutingEngine, LatLon, TransportMode, Isochrone, RouteMatrix } from 'rendezvous-kit'
+import type { RoutingEngine, LatLon, TransportMode, Isochrone, RouteMatrix, RouteGeometry } from 'rendezvous-kit'
 
 class MyEngine implements RoutingEngine {
   readonly name = 'MyEngine'
@@ -207,6 +210,10 @@ class MyEngine implements RoutingEngine {
 
   async computeRouteMatrix(origins: LatLon[], destinations: LatLon[], mode: TransportMode): Promise<RouteMatrix> {
     // call your API and return a RouteMatrix
+  }
+
+  async computeRoute(origin: LatLon, destination: LatLon, mode: TransportMode): Promise<RouteGeometry> {
+    // call your API and return a RouteGeometry with optional turn-by-turn legs
   }
 }
 ```
