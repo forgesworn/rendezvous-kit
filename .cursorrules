@@ -1,0 +1,65 @@
+# rendezvous-kit — Cursor Rules
+
+TypeScript library for finding fair meeting points for N people using isochrone intersection, venue search, and fairness scoring. Only runtime dependency is `geohash-kit` (ours). Zero third-party dependencies.
+
+## Architecture
+
+```
+src/
+  types.ts              — Shared TypeScript interfaces (RoutingEngine, LatLon, FairnessStrategy, etc.)
+  geo.ts                — Pure-TypeScript polygon geometry (Sutherland–Hodgman intersection, area, bbox, centroid, circle)
+  hull.ts               — Convex hull search strategy (fast path for closely spaced participants)
+  engines/
+    valhalla.ts         — Valhalla adapter (isochrone + matrix + route with turn-by-turn)
+    openrouteservice.ts — ORS adapter (isochrone + matrix; computeRoute not yet implemented)
+    graphhopper.ts      — GraphHopper adapter (isochrone + matrix; computeRoute not yet implemented)
+    osrm.ts             — OSRM adapter (matrix only, no isochrone or route)
+  venues.ts             — Overpass API venue search with tag mapping
+  rendezvous.ts         — findRendezvous pipeline (the main function)
+  validate.ts           — Input validation helpers (URL, timeout, JSON parsing)
+  index.ts              — Barrel re-export
+```
+
+## Key Patterns
+
+- **Engine-agnostic:** All routing goes through the `RoutingEngine` interface (3 methods: `computeIsochrone`, `computeRouteMatrix`, `computeRoute`)
+- **Dual pipeline:** `findRendezvous` chooses between isochrone intersection (precise, expensive) and hull search (fast, approximate) based on participant spread
+- **Fairness scoring:** `min_max` (default), `min_total`, `min_variance` — all produce a single number where lower is better
+- **GeoJSON coordinates:** Always `[longitude, latitude]` (GeoJSON standard, NOT `[lat, lon]`)
+- **ESM-only** with `.js` extensions in imports
+
+## Conventions
+
+- **British English** — favour, colour, behaviour, licence, initialise, metre
+- **TypeScript strict mode** — no `any`, no implicit returns
+- **JSDoc on all public exports**
+- **Zero third-party dependencies** — do not add external runtime deps
+- **Git:** commit messages use `type: description` format (e.g. `feat:`, `fix:`, `docs:`)
+
+## Build & Test
+
+```bash
+npm run build      # tsc → dist/
+npm test           # vitest run
+npm run typecheck  # tsc --noEmit
+npm run bench      # performance benchmarks
+```
+
+## Subpath Exports
+
+```typescript
+import { findRendezvous } from 'rendezvous-kit'                          // barrel
+import { intersectPolygons, centroid, circleToPolygon } from 'rendezvous-kit/geo'
+import { ValhallaEngine } from 'rendezvous-kit/engines/valhalla'
+import { OpenRouteServiceEngine } from 'rendezvous-kit/engines/openrouteservice'
+import { GraphHopperEngine } from 'rendezvous-kit/engines/graphhopper'
+import { OsrmEngine } from 'rendezvous-kit/engines/osrm'
+import { searchVenues } from 'rendezvous-kit/venues'
+```
+
+## Common Pitfalls
+
+- `findRendezvous` requires at least 2 participants — single-origin use cases should query the engine directly
+- OSRM cannot compute isochrones — calling `findRendezvous` with an `OsrmEngine` will fail unless `strategy: 'hull'` is used
+- The Overpass API has rate limits — in production, configure a self-hosted Overpass instance via `overpassUrl`
+- Valhalla returns distance in km; ORS returns metres — the engine adapters normalise this
