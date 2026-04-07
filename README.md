@@ -244,6 +244,138 @@ Run any example with `npx tsx examples/<name>.ts`.
 
 See [llms.txt](./llms.txt) for a concise API summary, or [llms-full.txt](./llms-full.txt) for the complete reference with examples.
 
+## How the Pipeline Works
+
+### Step 1: Parallel isochrone computation
+
+`findRendezvous` computes a reachability polygon for each participant in parallel.
+Every participant gets their own isochrone — a polygon representing everywhere they
+can reach within `maxTimeMinutes` using the specified transport mode:
+
+```typescript
+// Internally, all N isochrones are fetched concurrently:
+const isochrones = await Promise.all(
+  participants.map(p => engine.computeIsochrone(p, mode, maxTimeMinutes))
+)
+```
+
+This works identically for 2, 5, or 20 participants — each gets their own polygon.
+The engine does the heavy lifting; rendezvous-kit just orchestrates the parallel calls.
+
+### Step 2: N-polygon intersection
+
+All isochrone polygons are intersected left-to-right using Sutherland–Hodgman clipping.
+The result is the geographic area reachable by **every** participant within the time budget:
+
+```typescript
+import { intersectPolygonsAll } from 'rendezvous-kit/geo'
+
+// Folds left-to-right: clip polygon 2 against 1, then clip 3 against that result, etc.
+// Preserves disconnected components (e.g. two separate road corridors)
+const components = intersectPolygonsAll(isochrones.map(iso => iso.polygon))
+```
+
+If the intersection is empty (participants too far apart), `findRendezvous` returns `[]`.
+
+### Step 3: Venue search and scoring
+
+Venues are searched within the intersection zone via Overpass API, then each venue is
+scored using the chosen fairness strategy:
+
+```typescript
+const suggestions = await findRendezvous(engine, {
+  participants: [alice, bob, carol],
+  mode: 'drive',
+  maxTimeMinutes: 90,
+  venueTypes: ['cafe', 'restaurant'],
+  fairness: 'min_max',   // minimise the worst individual travel time
+  limit: 5,
+})
+// Each suggestion has: venue, travelTimes (per participant), fairnessScore
+```
+
+### When isochrones don't overlap
+
+If the isochrones don't intersect, `findRendezvous` returns an empty array. Options:
+
+1. **Increase `maxTimeMinutes`** — expand the reachability polygons
+2. **Switch transport mode** — `'drive'` covers more ground than `'walk'`
+3. **Use the `hull` strategy** — for nearby participants, the library automatically uses
+   a convex hull of participant positions as the search region instead of isochrones.
+   This always produces results because it searches the area *between* participants.
+
+If the intersection exists but contains no matching venues, the library falls back to
+a synthetic "Meeting point" at the area-weighted centroid of the intersection.
+
+## Switching Routing Engines
+
+OSRM does not support isochrone computation. If you're using OSRM and need the full
+pipeline, swap to an isochrone-capable engine:
+
+```typescript
+// Before: OSRM (route matrix only — no isochrones)
+import { OsrmEngine } from 'rendezvous-kit/engines/osrm'
+const engine = new OsrmEngine({ baseUrl: 'http://localhost:5000' })
+
+// After: Valhalla (self-hosted, free, full isochrone support)
+import { ValhallaEngine } from 'rendezvous-kit/engines/valhalla'
+const engine = new ValhallaEngine({ baseUrl: 'http://localhost:8002' })
+
+// Or: OpenRouteService (hosted API, requires free API key)
+import { OpenRouteServiceEngine } from 'rendezvous-kit/engines/openrouteservice'
+const engine = new OpenRouteServiceEngine({
+  apiKey: process.env.ORS_API_KEY!,
+  baseUrl: 'https://api.openrouteservice.org', // default
+})
+
+// Or: GraphHopper (self-hosted or hosted, API key optional for self-hosted)
+import { GraphHopperEngine } from 'rendezvous-kit/engines/graphhopper'
+const engine = new GraphHopperEngine({
+  baseUrl: 'http://localhost:8989',
+  apiKey: process.env.GRAPHHOPPER_KEY, // optional for self-hosted
+})
+
+// All engines implement the same RoutingEngine interface.
+// The rest of your code stays identical:
+const suggestions = await findRendezvous(engine, { participants, mode, ... })
+```
+
+For self-hosting guides (Docker one-liners for Valhalla, OSRM, GraphHopper), see
+[Self-Hosting a Routing Engine](./docs/self-hosting-a-routing-engine.md).
+
+## Architecture
+
+rendezvous-kit's pipeline combines two kinds of spatial operations:
+
+**Routing engine operations** (external): isochrone computation, route matrix, and
+route geometry. These call your chosen engine's HTTP API for real road-network
+calculations.
+
+**Local geometry operations** (pure TypeScript, no dependencies): polygon intersection
+(Sutherland–Hodgman), area calculation (shoelace), centroid computation, bounding boxes,
+and convex hull (via `geohash-kit/coverage`). These run entirely in-process with no
+network calls.
+
+The only external dependency is `geohash-kit`, which provides the `convexHull` function
+used by the hull-strategy fast path for nearby participants. All other polygon operations
+(intersection, clipping, triangulation, area) are implemented in `rendezvous-kit/geo`.
+
+```
+Participants ──→ Engine.computeIsochrone() ──→ Polygon[]
+                                                  │
+                                    intersectPolygonsAll()  ← local geometry
+                                                  │
+                                          Intersection zone
+                                                  │
+                                    searchVenues() via Overpass API
+                                                  │
+                              Engine.computeRouteMatrix() ──→ travel times
+                                                  │
+                                         scoreVenues()  ← local fairness calc
+                                                  │
+                                        Ranked suggestions
+```
+
 ## Troubleshooting
 
 **`findRendezvous` returns an empty array**
