@@ -1,10 +1,4 @@
 {
-  "projectTitle": "rendezvous-kit",
-  "description": "Find fair meeting points for N people using isochrone intersection, venue search, and fairness scoring. TypeScript.",
-  "excludeFolders": ["node_modules", "dist", "coverage", "src", "scripts", ".github", ".changeset"],
-  "rules": [
-    "Fairness is quantified — the engine minimises the maximum travel time across all participants.",
-    "Supports multiple travel modes: driving, cycling, walking, public transport.",
-    "Requires an isochrone provider (e.g. OpenRouteService, Mapbox) — bring your own API key."
-  ]
+  "url": "https://context7.com/forgesworn/rendezvous-kit",
+  "public_key": "pk_vdoXns3QEblb1693KnlDH"
 }
