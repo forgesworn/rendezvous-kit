@@ -10,3 +10,4 @@ dist/
 
 # Local AI agent settings
 .claude/
+.mcp.json
