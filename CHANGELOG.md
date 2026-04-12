@@ -1,3 +1,10 @@
+## [1.21.6](https://github.com/forgesworn/rendezvous-kit/compare/v1.21.5...v1.21.6) (2026-04-12)
+
+
+### Bug Fixes
+
+* resolve development dependency vulnerabilities ([943501a](https://github.com/forgesworn/rendezvous-kit/commit/943501ac54f03d3652dd6821d336a069e7f616aa))
+
 ## [1.21.5](https://github.com/forgesworn/rendezvous-kit/compare/v1.21.4...v1.21.5) (2026-03-20)
 
 
