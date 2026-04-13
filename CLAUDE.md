@@ -52,7 +52,7 @@ Overpass venue search uses public endpoints by default. Pass `overpassUrl` to `s
 
 ## Release & Versioning
 
-**Automated via semantic-release** — version bumps and npm publishing happen automatically when you push to `main`.
+**Automated via [forgesworn/anvil](https://github.com/forgesworn/anvil)** — `auto-release.yml` reads conventional commits on push to `main`, bumps the version, and creates a GitHub Release; `release.yml` then runs the pre-publish gates and publishes to npm via OIDC trusted publishing.
 
 | Type | Version Bump |
 |------|--------------|
@@ -61,4 +61,4 @@ Overpass venue search uses public endpoints by default. Pass `overpassUrl` to `s
 | `BREAKING CHANGE:` (in commit body) | Major (x.0.0) |
 | `chore:`, `docs:`, `refactor:` | None |
 
-Tests must pass before release. GitHub Actions uses OIDC trusted publishing. **Work on branches** — merge to main only when a logical chunk is complete to avoid version spam.
+Tests must pass before release. **Work on branches** — merge to main only when a logical chunk is complete to avoid version spam.
