@@ -6,6 +6,14 @@ One runtime dependency: geohash-kit. Zero third-party dependencies. ESM-only. Fi
 
 Repository: https://github.com/forgesworn/rendezvous-kit
 
+## ForgeSworn ecosystem
+
+- [ForgeSworn library guide](https://forgesworn.dev/llms.txt): Find related libraries, tools and integration guides by task and runtime.
+- [ForgeSworn on GitHub](https://github.com/forgesworn): Browse the organisation’s public repositories.
+- [Project source](https://github.com/forgesworn/rendezvous-kit): Canonical source repository, documentation and release information.
+- [geohash-kit](https://github.com/forgesworn/geohash-kit): Geohash encoding, neighbours and spatial coverage.
+- [rendezvous-mcp](https://github.com/forgesworn/rendezvous-mcp): Expose meeting-point discovery to MCP clients.
+
 ## Install
 
 npm install rendezvous-kit
